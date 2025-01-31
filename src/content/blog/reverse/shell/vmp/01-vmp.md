@@ -1,7 +1,7 @@
 ---
 title: VMP逆向题分析
 author: ermu0
-slug: vmpanalyse
+slug: shell-vmp
 featured: false
 draft: false
 tags:
