@@ -3,7 +3,7 @@ import type { Site, SocialObjects } from "./types";
 export const SITE: Site = {
   website: "https://ermu0.cn/", // replace this with your deployed domain
   author: "ermu0",
-  desc: "在读研究生,研究二进制安全、安全开发等",
+  desc: "在读研究生,研究二进制安全、安全开发等", // 这里改了没用，沃夫了
   title: "ermu0's Blog",
   ogImage: "astropaper-og.jpg",
   lightAndDarkMode: true,
@@ -19,8 +19,8 @@ export const LOCALE = {//这里我改成了中文显示
 } as const;
 
 export const LOGO_IMAGE = {
-  enable: true,
-  svg: false,
+  enable: true, // 这个是页面左上角图标
+  svg: false, //这个是标签的图标
   width: 46,
   height: 46,
 };
