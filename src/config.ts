@@ -7,8 +7,8 @@ export const SITE: Site = {
   title: "ermu0's Blog",
   ogImage: "astropaper-og.jpg",
   lightAndDarkMode: true,
-  postPerIndex: 2,
-  postPerPage: 4,
+  postPerIndex: 4, //这个是展示recent posts
+  postPerPage: 6, //这个是限制一页最多有多少posts展示
   scheduledPostMargin: 15 * 60 * 1000, // 15 minutes
   showArchives: true,
 };
