@@ -53,7 +53,7 @@ export const SOCIALS: SocialObjects = [
   {
     name: "Mail",
     href: "mailto:1710221274.com",//后面这里可以改成我域名下的qq
-    linkTitle: `Send an email to ${SITE.title}`,
+    linkTitle: `Send an email to me`,
     active: true,
   },
   {
