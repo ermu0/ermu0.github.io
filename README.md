@@ -1,4 +1,4 @@
 # ermu0's Blog :heart:
 
-![ermu0](https://c.img.dasctf.com/LightPicture/2025/01/babb18b01470b282.jpg)
+<img src="https://dl4.weshineapp.com/gif/20160607/c824328365e9ae63328f610c8e5c5c01.gif?f=micro_54yl55CQ" alt="img" style="zoom: 200%;" />
 
