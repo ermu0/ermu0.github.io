@@ -93,6 +93,8 @@ void* load_PE(char* PE_data) {
 }
 ```
 
+值得注意的是，IAT表与重定位表的修复需要在节区加载进入内存之后进行，因为只有当节区中的内容加载内存中，函数信息也才会被加载进入内存中，然后才能根据相应的地址对函数地址表以及重定位表进行修改。
+
 ### 1.2 导入函数地址表（IAT）与重定位表的修改
 
 导入函数地址表修复函数：
@@ -141,6 +143,8 @@ void fix_iat(char* p_image_base, IMAGE_NT_HEADERS* p_NT_headers) {
     }
 }
 ```
+
+> 这里说一下为什么在修复IAT之后还要修复重定位表？重定位表需要重定位是为了解决加载地址与编译时首选地址不一致的问题，确保程序在内存中的地址引用始终有效。
 
 重定位表修复函数：
 
@@ -331,9 +335,9 @@ int main() {
         __asm__ volatile (
             "call 1f;\n"             // 调用 next
             "1:\n"                   // 局部标签 next
-            "movl $2f, (%esp);\n"    // 修改返回地址为 continue_label
-            "ret;\n"                 // 返回到 continue_label
-            "2:\n"                   // 局部标签 continue_label
+            "movl $2f, (%esp);\n"    // 修改返回地址为 offset_label2
+            "ret;\n"                 // 返回到 offset_label2
+            "2:\n"                   // 局部标签 offset_label2
             :
         :
             : "memory"
@@ -372,15 +376,33 @@ int main() {
 }
 ```
 
+主函数没什么好说的，关于那三段花指令，实际上只有第二段才不会被IDA的反汇编直接识别，它的逻辑我在代码段中已经说明了，作用就是干扰像IDA一类的反汇编，使之出现栈分析出错的效果。
+
+下面看一下加花指令前后的对比图：
+
+![加花前后的对比](https://c.img.dasctf.com/LightPicture/2025/02/eeabed5b00b1d779.png)
+
 ### 1.5 OLLVM混淆
 
 OLLVM项目自带Clang编译器，被我配置在了项目里。我这里OLLVM的配置方式很简单（相较于自己编译OLLVM项目而言），参考的是这篇帖子[^4]。
 
-关于OLLVM的介绍、它在Linux上的配置、它的使用方法可以去看我的另几篇帖子。
+关于OLLVM的介绍、它在Linux上的配置以及在Linux上的使用方法可以去看我的另几篇帖子。
+
+下面给看一下使用OLLVM混淆前后的对比。
+
+混淆前：
+
+![OLLVM-fla混淆前](https://c.img.dasctf.com/LightPicture/2025/02/c80eaa31984863dc.png)
+
+混淆后：
+
+![OLLVM-fla混淆后](https://c.img.dasctf.com/LightPicture/2025/02/8316f670d2eacf6c.png)
+
+
 
 ## 2. 加壳器
 
-加壳器我这里用的python写的，主要是为了方便使用这个lief，这个库里的一些API函数可以自动完成对PE头的修改、节区头的创建以及字段的自动填充。总而言之，很方便。
+加壳器我这里用的python写的，主要是为了方便使用这个lief，这个库里的一些API函数可以自动完成对PE头的修改、节区头的创建以及字段的自动填充。
 
 加壳器代码如下：
 ```python
@@ -469,6 +491,41 @@ data_section_add_offset = 0x1f0
 目的就是为了将自定义的节区名字存到这里，然后使壳程序加载时能够找到源程序所在节区的位置。
 
 这种行为有点蠢，不值得提倡，后续需要更改。
+
+加壳器的工具类代码如下：
+
+```python
+import os
+## 返回对齐后的大小(支持文件对齐/内存对齐)
+# parm1:节区数据
+# parm2:节区对齐单位
+def align(data, alignment):
+    return (len(data) + alignment - 1) & ~(alignment - 1)
+
+## 将节区数据进行对齐填充（支持文件对齐）
+# parm1:加密后的数据
+# parm2:节区对齐单位
+def align_data(data, alignment):
+    padding = (alignment - (len(data) % alignment)) % alignment
+    return data + b'\x00' * padding
+
+# 异或加密（后续如果有需要可以在此基础上修改）
+def xor_encrypt(data, key):
+    return bytearray(b ^ key for b in data)
+
+# 读取文件并返回二进制形式
+def read_file(path):
+    # 先判断文件是否存在
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File is not found:{path}")
+
+    with open(path,"rb") as f:
+        return f.read()
+```
+
+由于我这里采用的是简单的异或加密，因此节区对不对齐影响不大，如果用其他加密方式还是要考虑对齐。
+
+文章写的比较粗糙，后面会再慢慢修改，请多见谅😟
 
 ## 参考链接
 
