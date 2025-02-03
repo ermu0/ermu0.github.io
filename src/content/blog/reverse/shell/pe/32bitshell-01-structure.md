@@ -160,7 +160,7 @@ typedef struct _IMAGE_OPTIONAL_HEADER {
 
 - **AddressOfEntryPoint**（4字节）：该字段是文件执行时的入口地址，字段值实际存的是一个RVA，所以需要加上基址才能得到才能得到程序在内存中的运行地址VA。另外，如果想要在一个可执行文件中附加一段代码并且要让这段代码先被执行，就需要更改入口地址到目标代码上，然后再跳转回原有的入口地址。
 
-- **ImageBase**（4字节）：这个字段就是文件基址。但可能出现地址被占用的情况（这个后面碰见了再细说）
+- **ImageBase**（4字节）：这个字段就是**基址**，但可能出现地址被占用的情况。（所以需要重定位表）
 
 - **SectionAlignment**（4字节）：文件被加载到内存后的节区对齐单位，节区被装入内存的虚拟地址必须是该成员的整数倍。（对齐就好比书本页一样，每个节区的内容就拓印在书本页上，即使当前节区的内容不足一页，但仍将剩下的页面给予当前节区，这样一来，翻书的时候只需要在目录告知哪几页是哪个节区的内容，这样一来就比不对齐——一页上面有多个节区内容要好找得多）
 
@@ -198,27 +198,29 @@ SizeOfHeaders = (e_lfanew/*DOS头部*/ +　4/*PE签名*/ +
 
   ![不同表的下标](https://bbs.kanxue.com/upload/attach/202111/919233_BRRDKGZZY3A2JH2.jpg)
 
-由于本文章内容主要是实现加壳操作，所以只探究导入表和导入地址表，这里以导入表为例子。
+由于本文章内容主要是实现加壳操作，所以只探究<u>导入表</u>和<u>导入地址表</u>，这里以**导入表**为例子。
 
-导入表的每一项也是一个结构体，用于描述一个DLL文件及其相关的导入信息，结构如下：
+导入表的每一项也是一个结构体，用于描述一个DLL文件及其相关的导入信息，它的结构如下：
 
   ```c
   typedef struct _IMAGE_IMPORT_DESCRIPTOR {
-      DWORD OriginalFirstThunk;   // 指向导入名称表（INT），保存导入函数的原始信息
+      DWORD OriginalFirstThunk;   // 指向IMAGE_THUNK_DATA结构的数组，保存导入函数的原始信息
       DWORD TimeDateStamp;        // 时间戳（调试用）
       DWORD ForwarderChain;       // 转发链（调试用）
       DWORD Name;                 // 指向 DLL 名称的 RVA（相对于文件基址的偏移）
-      DWORD FirstThunk;           // 指向导入地址表（IAT）
+      DWORD FirstThunk;           // 同样指向IMAGE_THUNK_DATA结构的数组
   } IMAGE_IMPORT_DESCRIPTOR;
   ```
 
   这里主要关注三个字段：
 
-  - **OriginalFirstThunk**：指向IDT表的RVA
-  - **Name**：虽然名字感觉像是DLL的name，实际上还是一个RVA，需要利用基址来计算VA才能得到名字
-  - **FirstThunk**：指向IAT表的RVA
+  - **OriginalFirstThunk**：这个字段值是一个RVA，指向**IMAGE_THUNK_DATA**结构的数组，数组元素就是函数相关信息。
+  - **Name**：实际上是一个RVA，指向DLL名称。
+  - **FirstThunk**：这个字段值也是一个RVA，同样指向**IMAGE_THUNK_DATA**结构的数组，也就是IAT表。
 
-  上面的IDT与IAT（未修改前）中的每一项也都是一个结构体，结构如下：
+  上面的OriginalFirstThunk与FirstThunk在PE文件还没有执行时都指向相同的结构。区别在于当PE文件执行后，OriginalFirstThunk所指向的数组元素不会改变，而FirstThunk所指向的数组，其中的元素会被重写为所导入函数的真实地址（加载到内存后的地址），从而变成**导入函数地址表**（**IAT**）。
+
+**IMAGE_THUNK_DATA**结构如下：
 
   ```c
   typedef struct _IMAGE_THUNK_DATA {
@@ -230,12 +232,20 @@ SizeOfHeaders = (e_lfanew/*DOS头部*/ +　4/*PE签名*/ +
   } IMAGE_THUNK_DATA;
   ```
 
-  这里着重关注AddressofData字段，这个字段值有两种情况：偏移值 或者 序号值
+  该结构在不同情况下的成员不同，但这里着重关注**AddressofData**字段。
 
-  - 偏移值加上基址后指向的是个结构体：这个结构体叫做**IMAGE_IMPORT_BY_NAME**，在该结构体下有一个Name字段，该字段是一个地址，存储的是DLL中某个函数名称，然后通过GetProcAddress函数，就能得到DLL加载进内存后，其中映射到内存中的函数地址。
-  - 序号值：同样利用GetProcAddress函数，就能直接得到映射到内存中的函数地址。
+- **AddressofData**：这个字段值有两种情况：<u>偏移值</u> 或者 <u>序号值</u>。
+  - 字段为**偏移值**时，指向一个叫**IMAGE_IMPORT_BY_NAME**的结构。在该结构体下有一个**Name**字段，该字段是一个地址，指向的是DLL中某个函数的名称。在代码中可以通过GetProcAddress函数，来得到该DLL下的这个函数加载到内存后的地址。
+  - 该字段为**序号值**时，在代码中可以直接作为参数来使用GetProcAddress函数，从而得到相应的函数加载到内存后的地址。
 
-  最后将得到的函数地址放进对应的IAT表中修改，就能完成对IAT的修改。
+**IMAGE_IMPORT_BY_NAME**结构如下：
+
+```c
+typedef struct _IMAGE_IMPORT_BY_NAME {
+	Hint WORD //忽略设置为0
+	Name BYTE //导入函数名称
+};IMAGE_IMPORT_BY_NAME
+```
 
 ## 4. SECTION头
 
