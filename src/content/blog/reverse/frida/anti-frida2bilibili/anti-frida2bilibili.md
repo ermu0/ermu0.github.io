@@ -7,8 +7,8 @@ draft: false
 tags:
   - Reverse
   - frida
-pubDatetime: 2025-03-20T12:31:19+08:00
-modDatatime: 2025-03-20T12:31:19+08:00
+pubDatetime: 2025-03-20T14:31:19+08:00
+modDatatime: 2025-03-20T14:31:19+08:00
 description: 对bilibili.apk的一次frida检测绕过记录
 ---
 
